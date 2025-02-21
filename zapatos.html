@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruleta</title>
+    <link rel="icon" href="img/logo.jpeg" type="image/jpeg">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Estilos adicionales para mejorar la responsividad */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        .canvas-container {
+            position: relative;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        #rouletteCanvas {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+
+        @media (max-width: 576px) { /* Ajustes específicos para dispositivos móviles */
+            #rouletteCanvas {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-5">Ruleta de ganadores del calzado</h1>
+        <div class="canvas-container">
+            <canvas id="rouletteCanvas" width="800" height="800"></canvas>
+            <div class="arrow"></div>
+        </div>
+        <button id="spinButton" class="btn btn-primary mt-3"> 🎰 Girar Ruleta</button>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="winnerModal" tabindex="-1" aria-labelledby="winnerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="winnerModalLabel">🏆 ¡Ganadores!</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul id="winnerList" class="list-group">
+                        <!-- Aquí se mostrarán los ganadores dinámicamente -->
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archivos de audio -->
+    <audio id="spinnerSound" src="mp3/spinner.mp3"></audio>
+    <audio id="winnerSound" src="mp3/winner.mp3"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.13.1/underscore.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.4.0/dist/confetti.browser.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            var jsonUrl = 'competidores.json';
+            var spinTime = 11500; // Tiempo de giro en milisegundos
+            var initialSpinSpeed = 500; // Velocidad inicial
+            var minSpinSpeed = 100; // Velocidad mínima
+            var updateInterval = 10; // Intervalo de actualización
+            var spinCount = 0; // Contador de giros
+    
+            var canvas = document.getElementById('rouletteCanvas');
+            var ctx = canvas.getContext('2d');
+            var numSegments = 0;
+            var angle = 0;
+            var competitorsData = [];
+            var spinSpeed = initialSpinSpeed;
+    
+            // Lista de ganadores en orden
+            var winnersList = ["Participante 9", "Participante 22", "Participante 28", "Participante 19"];
+    
+            // Cargar JSON
+            $.getJSON(jsonUrl, function(data) {
+                competitorsData = data;
+                numSegments = competitorsData.length;
+                angle = (2 * Math.PI) / numSegments;
+    
+                shuffleArray(competitorsData);
+                createRoulette();
+            }).fail(function() {
+                console.error('Error al cargar el archivo JSON.');
+            });
+    
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+    
+            function createRoulette() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (var i = 0; i < numSegments; i++) {
+                    var startAngle = i * angle;
+                    var endAngle = (i + 1) * angle;
+                    var randomColor = competitorsData[i].color;
+    
+                    ctx.beginPath();
+                    ctx.moveTo(canvas.width / 2, canvas.height / 2);
+                    ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, startAngle, endAngle);
+                    ctx.fillStyle = randomColor;
+                    ctx.fill();
+                }
+    
+                for (var i = 0; i < numSegments; i++) {
+                    var midAngle = i * angle + (angle / 2);
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = '#FFF';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.save();
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate(midAngle);
+                    var text = competitorsData[i].name;
+                    ctx.fillText(text, canvas.width / 3, 0);
+                    ctx.restore();
+                }
+            }
+    
+            function spinRoulette() {
+                if (spinCount >= winnersList.length) return; // Evita más giros de los necesarios
+    
+                var winnerName = winnersList[spinCount]; // Selecciona el ganador según el orden
+                spinCount++; // Incrementa el contador de giros
+    
+                var place = ["🥇 1er", "🥈 2do", "🥉 3er", "🏅 4to"]; // Etiquetas de posiciones
+                var winnerText = `<li class="list-group-item">${place[spinCount - 1]} lugar: ${winnerName}</li>`;
+    
+                $('#winnerList').append(winnerText); // Agrega el ganador a la lista en el modal
+                $('#winnerModal').modal('show'); // Muestra el modal
+    
+                document.getElementById('winnerSound').play();
+    
+                confetti({
+                    particleCount: 300,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+    
+            $('#spinButton').click(function() {
+                if (spinCount >= winnersList.length) {
+                    alert("Todos los ganadores han sido seleccionados.");
+                    return;
+                }
+    
+                document.getElementById('spinnerSound').play();
+                $(this).prop('disabled', true);
+    
+                var startTime = Date.now();
+                var spinInterval = setInterval(function() {
+                    var elapsedTime = Date.now() - startTime;
+                    var spinAcceleration = 1;
+                    spinSpeed = initialSpinSpeed * Math.exp(-spinAcceleration * elapsedTime / spinTime);
+                    spinSpeed = Math.max(spinSpeed, minSpinSpeed);
+    
+                    var spinAngle = (spinSpeed * elapsedTime / 1000) % 360;
+                    canvas.style.transform = 'rotate(' + spinAngle + 'deg)';
+    
+                    if (elapsedTime >= spinTime) {
+                        clearInterval(spinInterval);
+                        canvas.style.transform = 'rotate(0deg)';
+                        spinRoulette();
+                        $('#spinButton').prop('disabled', false);
+                    }
+                }, updateInterval);
+            });
+        });
+    </script>
+    
+</body>
+</html>
